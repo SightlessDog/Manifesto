@@ -1,0 +1,12 @@
+.DS_Store
+.idea/
+.venv/
+_build/
+notebooks/
+setup
+conf.py
+index.rst
+.coverage
+*.pyc
+setup_mac.sh
+.pytest_cache
