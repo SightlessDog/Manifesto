@@ -4,11 +4,13 @@ from imutils.video import VideoStream
 import argparse
 import datetime
 import time
+from src.center_tracker import center_tracker
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video", help="path to the video file")
 ap.add_argument("-a", "--min-area", type=int, default=500, help="minimum size area")
 args = vars(ap.parse_args())
+ct = center_tracker(10)
 
 if args.get("video", None) is None:
     vs = VideoStream(src=0).start()
@@ -40,20 +42,23 @@ while True:
     thresh = cv2.dilate(thresh, None, iterations=2)
     cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cnts = imutils.grab_contours(cnts)
-
+    rects = []
     for c in cnts:
         if cv2.contourArea(c) < args["min_area"]:
             continue
-
         (x, y, w, h) = cv2.boundingRect(c)
+        rectangle = (x, y, w, h)
+        rects.append(rectangle)
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
         text = "Occupied"
 
-    cv2.putText(frame, "Room Status: {}".format(text), (10, 20),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-    cv2.putText(frame, datetime.datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),
-                (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
-
+    objects = ct.update(rects)
+    for (objectID, center) in objects.items():
+        text = "ID {}".format(objectID)
+        cv2.putText(frame, text, (center[0] - 10, center[1] - 10),
+			cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        cv2.circle(frame, (center[0], center[1]), 4, (0, 255, 0), -1)
+        print(objectID, center)
     cv2.imshow("Security feed", frame)
     cv2.imshow("Thresh", thresh)
     cv2.imshow("Frame Delta", frameDelta)
