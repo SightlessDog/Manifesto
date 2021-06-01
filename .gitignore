@@ -10,3 +10,4 @@ index.rst
 *.pyc
 setup_mac.sh
 .pytest_cache
+mobilnet
