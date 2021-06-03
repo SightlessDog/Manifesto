@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
 from center_tracker import center_tracker
 from persontrackable import PersonTrackable
+from Stitcher.stitch import stitch
 from imutils.video import VideoStream
 from imutils.video import FPS
 import numpy as np
@@ -8,14 +10,19 @@ import imutils
 import time
 import dlib
 import cv2
+import json
+
+from Kafka.kafkaProducer import kafka_producer
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-p", "--prototxt",
                 help="path to Caffe 'deploy' prototxt file")
 ap.add_argument("-m", "--model",
                 help="path to Caffe pre-trained model")
-ap.add_argument("-i", "--input", type=str,
+ap.add_argument("-i1", "--firstInput", type=str,
                 help="path to optional input video file")
+ap.add_argument("-i2", "--secondInput", type=str,
+                help="path to optional second input video file")
 ap.add_argument("-o", "--output", type=str,
                 help="path to optional output video file")
 ap.add_argument("-c", "--confidence", type=float, default=0.4,
@@ -34,7 +41,8 @@ net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 
 if not args.get("input", False):
     print("[INFO] starting video stream...")
-    vs = VideoStream(src=0).start()
+    vs1 = VideoStream(src=0).start()
+    # vs2 = VideoStream(src=1).start()
     time.sleep(2.0)
 
 writer = None
@@ -48,15 +56,20 @@ trackable_persons = {}
 # Frames initialisation, and moving persons
 total_frames = 0
 total_persons = 0
+stitch = stitch()
+producer = kafka_producer(1002, "raspi1")
 
 fps = FPS().start()
 
 while True:
-    frame = vs.read()
-    frame = frame[1] if args.get("input", False) else frame
+    frame1 = vs1.read()
+    frame1 = frame1[1] if args.get("firstInput", False) else frame1
+    # frame2 = vs2.read()
+    # frame2 = frame2[1] if args.get("secondInput", False) else frame2
 
+    # frame = stitch.update(frame1, frame2)
     # resize the frame and convert it from bgr to rgb for dlib
-    frame = imutils.resize(frame, width=500)
+    frame = imutils.resize(frame1, width=500)
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     # Set the frame dimensions
@@ -123,9 +136,14 @@ while True:
             cv2.putText(frame, text, (center[0] - 10, center[1] - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
             cv2.circle(frame, (center[0], center[1]), 4, (0, 255, 0), -1)
+            x_center = int(center[0])
+            y_center = int(center[1])
+            print(center[0], x_center)
+            print(center[1], y_center)
+            data_to_send = {"center x": int(x_center), "center y": int(y_center), "id": int(object_id)}
+            json_data = json.dumps(data_to_send)
+            producer.send(data_to_send)
     info = [
-        ("Up", ""),
-        ("Down",""),
         ("Status", status),
     ]
     # loop over the info tuples and draw them on our frame

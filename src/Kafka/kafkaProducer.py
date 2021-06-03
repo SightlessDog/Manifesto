@@ -1,12 +1,18 @@
+# -*- coding: utf-8 -*-
+import json
 from kafka import KafkaProducer
 
-bootstrap_servers = ['localhost:9092']
-topicName = 'raspi1'
 
-producer = KafkaProducer(bootstrap_servers = bootstrap_servers, retries = 5)
+class kafka_producer():
 
-while True:
-    ack = producer.send(topicName, b'Hello from python')
-    metadata = ack.get()
-    print(metadata.topic)
-    print(metadata.partition)
+    def __init__(self, port, topic):
+        self.bootstrap_servers = ['localhost:9092']
+        self.producer = KafkaProducer(bootstrap_servers=self.bootstrap_servers, retries=5,
+                                      value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+        self.topicName = topic
+
+    def send(self, message):
+        ack = self.producer.send(self.topicName, message)
+        metadata = ack.get()
+        print(metadata.topic)
+        print(metadata.partition)

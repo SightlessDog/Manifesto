@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 class PersonTrackable:
     def __init__(self, object_id, center):
         # Store the object_id of the person that we are tracking and initialize a list of centers
