@@ -72,7 +72,7 @@ if not args.get("input", False):
     print("[INFO] starting cameras...")
     vs1 = VideoStream(src=0).start()
     vs2 = VideoStream(src=1).start()
-    time.sleep(10.0)
+    time.sleep(2.0)
 writer = None
 # Frame dimensions initialisation
 W = None
@@ -90,13 +90,13 @@ producer = kafka_producer(1002, "raspi1")
 fps = FPS().start()
 
 while True:
-    frame1 = vs1.read()
+    #frame1 = vs1.read()
     frame2 = vs2.read()
 
-    frame = stitch.update(frame1, frame2)
+    # frame = stitch.update(frame1, frame2)
     # resize the frame and convert it from bgr to rgb for dlib
-    frame = imutils.resize(frame, width=400)
-    # rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = imutils.resize(frame2, width=400)
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     # Set the frame dimensions
     if W is None or H is None:
@@ -110,7 +110,7 @@ while True:
         status = "Detecting"
         trackers = []
         # Convert the frame to a blob
-        blob = cv2.dnn.blobFromImage(frame, 0.008, (W, H), 127, 5)
+        blob = cv2.dnn.blobFromImage(rgb, 0.008, (W, H), 127, 5)
         net.setInput(blob)
         detections = net.forward()
         for i in np.arange(0, detections.shape[2]):
@@ -126,23 +126,23 @@ while True:
                 # compute the (x, y)-coordinates of the bounding box for the object
                 box = detections[0, 0, i, 3:7] * np.array([W, H, W, H])
                 (startX, startY, endX, endY) = box.astype("int")
-                bb = (startX, startY, endX, endY)
-                # create two brand new input and output queues
-                iq = multiprocessing.Queue()
-                oq = multiprocessing.Queue()
-                inputQueues.append(iq)
-                outputQueues.append(oq)
-
-                # Spawn a daemon process for a new object tracker
-                p = multiprocessing.Process(target=start_t, args=(bb, label, frame, iq, oq))
-                p.daemon = True
-                p.start()
+                # Construct a dlib rectangle object from the bounding box coords and then start the dlib correlatio tracker
+                tracker = dlib.correlation_tracker()
+                rect = dlib.rectangle(startX, startY, endX, endY)
+                tracker.start_track(rgb, rect)
+                # Add the tracker to the list of trackers so we can utilize them when skipping the frames
+                trackers.append(tracker)
     # Otherwise we use our trackers list
     else:
-        for iq in inputQueues:
-            iq.put(frame)
-        for oq in outputQueues:
-            (label, (startX, startY, endX, endY)) = oq.get()
+        for tracker in trackers:
+            status = "Tracking"
+            # Update the tracker and grab the updated position
+            tracker.update(rgb)
+            pos = tracker.get_position()
+            startX = int(pos.left())
+            startY = int(pos.top())
+            endX = int(pos.right())
+            endY = int(pos.bottom())
             rects.append((startX, startY, endX, endY))
 
         objects = ct.update(rects)
@@ -165,9 +165,10 @@ while True:
             cv2.circle(frame, (center[0], center[1]), 4, (0, 255, 0), -1)
             x_center = int(center[0])
             y_center = int(center[1])
-            print(center[0], x_center)
-            print(center[1], y_center)
-            data_to_send = {"center x": int(x_center), "center y": int(y_center), "id": int(object_id)}
+            # print(center[0], x_center)
+            # print(center[1], y_center)
+            print(x_center, y_center)
+            data_to_send = {"centerX": int(x_center), "centerY": int(y_center), "id": int(object_id)}
             json_data = json.dumps(data_to_send)
             producer.send(data_to_send)
     info = [
@@ -191,7 +192,7 @@ while True:
 
 # stop the timer and display FPS information
 fps.stop()
-print("[INFO] elapsed time: {:.2f}".format(fps.elapsed()))
-print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
+# print("[INFO] elapsed time: {:.2f}".format(fps.elapsed()))
+# print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
 vs2.release()
 cv2.destroyAllWindows()

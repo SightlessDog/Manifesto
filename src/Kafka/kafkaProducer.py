@@ -14,5 +14,5 @@ class kafka_producer():
     def send(self, message):
         ack = self.producer.send(self.topicName, message)
         metadata = ack.get()
-        print(metadata.topic)
-        print(metadata.partition)
+        # print(metadata.topic)
+        # print(metadata.partition)

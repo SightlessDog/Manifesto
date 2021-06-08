@@ -65,6 +65,6 @@ class StitcherClass:
                                              thresh)
             # return the matches along with the homograpy matrix
             # and status of each matched point
-            print("[INFO] returning matches", matches, H, status)
+            print("[INFO] returning matches")
             return (matches, H, status)
         return None
