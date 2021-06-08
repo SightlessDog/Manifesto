@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
+
+import cv2
 from Stitcher.stitcherclass import StitcherClass
 import imutils
 
@@ -23,4 +25,7 @@ class stitch:
 			print("[INFO] homography could not be computed")
 			return None
 		self.total += 1
-		return result
+		gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+		gray = cv2.GaussianBlur(gray, (21, 21), 0)
+		print("[INFO] homography computed, returning the result")
+		return gray

@@ -5,14 +5,38 @@ from Stitcher.stitch import stitch
 from imutils.video import VideoStream
 from imutils.video import FPS
 import numpy as np
+import multiprocessing
 import argparse
 import imutils
 import time
 import dlib
 import cv2
 import json
-
 from Kafka.kafkaProducer import kafka_producer
+
+def start_t(box, label, rgb, inputQueue, outputQueue):
+    # construct a dlib rectangle object from the bounding box
+    # coordinates and then start the correlation tracker
+    t = dlib.correlation_tracker()
+    rect = dlib.rectangle(box[0], box[1], box[2], box[3])
+    t.start_track(rgb, rect)
+    trackers.append(t)
+
+    while True:
+        rgb = inputQueue.get()
+
+        if rgb is not None:
+            t.update(rgb)
+            pos = t.get_position()
+
+            # unpack the position object
+            startX = int(pos.left())
+            startY = int(pos.top())
+            endX = int(pos.right())
+            endY = int(pos.bottom())
+            # add the label + bounding box coordinates to the output
+            # queue
+            outputQueue.put((label, (startX, startY, endX, endY)))
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-p", "--prototxt",
@@ -31,6 +55,11 @@ ap.add_argument("-s", "--skip-frames", type=int, default=30,
                 help="# of skip frames between detections")
 args = vars(ap.parse_args())
 
+# initialize our lists of queues -- both input queue and output queue
+# for *every* object that we will be tracking
+inputQueues = []
+outputQueues = []
+
 CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
            "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
            "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
@@ -40,11 +69,10 @@ print("[INFO] loading models...")
 net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 
 if not args.get("input", False):
-    print("[INFO] starting video stream...")
+    print("[INFO] starting cameras...")
     vs1 = VideoStream(src=0).start()
-    # vs2 = VideoStream(src=1).start()
-    time.sleep(2.0)
-
+    vs2 = VideoStream(src=1).start()
+    time.sleep(10.0)
 writer = None
 # Frame dimensions initialisation
 W = None
@@ -63,14 +91,12 @@ fps = FPS().start()
 
 while True:
     frame1 = vs1.read()
-    frame1 = frame1[1] if args.get("firstInput", False) else frame1
-    # frame2 = vs2.read()
-    # frame2 = frame2[1] if args.get("secondInput", False) else frame2
+    frame2 = vs2.read()
 
-    # frame = stitch.update(frame1, frame2)
+    frame = stitch.update(frame1, frame2)
     # resize the frame and convert it from bgr to rgb for dlib
-    frame = imutils.resize(frame1, width=500)
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = imutils.resize(frame, width=400)
+    # rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     # Set the frame dimensions
     if W is None or H is None:
@@ -80,7 +106,7 @@ while True:
     status = "Waiting"
     rects = []
     # Trigger object detection each x frames
-    if total_frames % args["skip_frames"] == 0:
+    if total_frames % args["skip_frames"] == 0 and len(inputQueues) == 0:
         status = "Detecting"
         trackers = []
         # Convert the frame to a blob
@@ -93,29 +119,30 @@ while True:
             if confidence > args["confidence"]:
                 # Extract the index from the list
                 idx = int(detections[0, 0, i, 1])
+                label = CLASSES[idx]
                 # if the class label is not a person, ignore it
                 if CLASSES[idx] != "person":
                     continue
                 # compute the (x, y)-coordinates of the bounding box for the object
                 box = detections[0, 0, i, 3:7] * np.array([W, H, W, H])
                 (startX, startY, endX, endY) = box.astype("int")
-                # Construct a dlib rectangle object from the bounding box coords and then start the dlib correlatio tracker
-                tracker = dlib.correlation_tracker()
-                rect = dlib.rectangle(startX, startY, endX, endY)
-                tracker.start_track(rgb, rect)
-                # Add the tracker to the list of trackers so we can utilize them when skipping the frames
-                trackers.append(tracker)
+                bb = (startX, startY, endX, endY)
+                # create two brand new input and output queues
+                iq = multiprocessing.Queue()
+                oq = multiprocessing.Queue()
+                inputQueues.append(iq)
+                outputQueues.append(oq)
+
+                # Spawn a daemon process for a new object tracker
+                p = multiprocessing.Process(target=start_t, args=(bb, label, frame, iq, oq))
+                p.daemon = True
+                p.start()
     # Otherwise we use our trackers list
     else:
-        for tracker in trackers:
-            status = "Tracking"
-            # Update the tracker and grab the updated position
-            tracker.update(rgb)
-            pos = tracker.get_position()
-            startX = int(pos.left())
-            startY = int(pos.top())
-            endX = int(pos.right())
-            endY = int(pos.bottom())
+        for iq in inputQueues:
+            iq.put(frame)
+        for oq in outputQueues:
+            (label, (startX, startY, endX, endY)) = oq.get()
             rects.append((startX, startY, endX, endY))
 
         objects = ct.update(rects)
@@ -166,5 +193,5 @@ while True:
 fps.stop()
 print("[INFO] elapsed time: {:.2f}".format(fps.elapsed()))
 print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
-vs.release()
+vs2.release()
 cv2.destroyAllWindows()

@@ -18,18 +18,18 @@ class StitcherClass:
             (kpsB, featuresB) = self.detectAndDescribe(imageB)
 
             # match features between the two images
-            M = self.matchKeypoints(kpsA, kpsB,
+            m = self.matchKeypoints(kpsA, kpsB,
                                     featuresA, featuresB, ratio, thresh)
 
             # if the match is None, then there aren't enough matched
             # keypoints to create a panorama
-            if M is None:
+            if m is None:
+                print("[INFO] Match features are none")
                 return None
             # cache the homography matrix
-            self.cachedH = M[1]
+            self.cachedH = m[1]
 
         # apply a perspective transform to stitch the images together using the cached homography matrix
-        (matches, H, status) = M
         result = cv2.warpPerspective(imageA, self.cachedH, (imageA.shape[1] + imageB.shape[1], imageA.shape[0]))
         result[0:imageB.shape[0], 0:imageB.shape[1]] = imageB
         return result
@@ -51,7 +51,7 @@ class StitcherClass:
         matches = []
 
         # Loop over the matches
-        for m in matches:
+        for m in rawMatches:
             # ensure the distance is within a certain ration of each other
             if len(m) == 2 and m[0].distance < m[1].distance * ratio:
                 matches.append((m[0].trainIdx, m[0].queryIdx))
@@ -65,5 +65,6 @@ class StitcherClass:
                                              thresh)
             # return the matches along with the homograpy matrix
             # and status of each matched point
+            print("[INFO] returning matches", matches, H, status)
             return (matches, H, status)
         return None
