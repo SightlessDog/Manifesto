@@ -49,13 +49,14 @@ class StitcherClass:
         matcher = cv2.DescriptorMatcher_create("BruteForce")
         rawMatches = matcher.knnMatch(featuresA, featuresB, 2)
         matches = []
-
+        print("[DEBUG] rawmatches are", rawMatches)
         # Loop over the matches
         for m in rawMatches:
             # ensure the distance is within a certain ration of each other
             if len(m) == 2 and m[0].distance < m[1].distance * ratio:
                 matches.append((m[0].trainIdx, m[0].queryIdx))
         # computing a homography requires at least 4 matches
+        print("[DEBUG] macthes are", matches)
         if len(matches) > 4:
             ptsA = np.float32([kpsA[i] for (_, i) in matches])
             ptsB = np.float32([kpsB[i] for (i, _) in matches])
@@ -67,4 +68,5 @@ class StitcherClass:
             # and status of each matched point
             print("[INFO] returning matches")
             return (matches, H, status)
+        print("[INFO] something went wrong in matchKeyPoints returning None")
         return None

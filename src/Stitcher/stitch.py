@@ -13,19 +13,19 @@ class stitch:
 
 	def update(self, right, left):
 		# resize the frames
-		left = imutils.resize(left, width=400)
-		right = imutils.resize(right, width=400)
+		left = imutils.resize(left, width=400, height=225)
+		right = imutils.resize(right, width=400, height=225)
 		# stitch the frames together to form the panorama
 		# IMPORTANT: you might have to change this line of code
 		# depending on how your cameras are oriented; frames
 		# should be supplied in left-to-right order
-		result = self.stitcher.stitch([left, right])
+		result = self.stitcher.stitch([right, left])
 		# no homograpy could be computed
 		if result is None:
 			print("[INFO] homography could not be computed")
 			return None
 		self.total += 1
-		gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
-		gray = cv2.GaussianBlur(gray, (11, 11), 0)
+		# gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+		# gray = cv2.GaussianBlur(gray, (11, 11), 0)
 		print("[INFO] homography computed, returning the result")
-		return gray
+		return result

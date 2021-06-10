@@ -38,6 +38,7 @@ def start_t(box, label, rgb, inputQueue, outputQueue):
             # queue
             outputQueue.put((label, (startX, startY, endX, endY)))
 
+
 ap = argparse.ArgumentParser()
 ap.add_argument("-p", "--prototxt",
                 help="path to Caffe 'deploy' prototxt file")
@@ -49,9 +50,9 @@ ap.add_argument("-i2", "--secondInput", type=str,
                 help="path to optional second input video file")
 ap.add_argument("-o", "--output", type=str,
                 help="path to optional output video file")
-ap.add_argument("-c", "--confidence", type=float, default=0.4,
+ap.add_argument("-c", "--confidence", type=float, default=0.6,
                 help="minimum probability to filter weak detections")
-ap.add_argument("-s", "--skip-frames", type=int, default=30,
+ap.add_argument("-s", "--skip-frames", type=int, default=60,
                 help="# of skip frames between detections")
 args = vars(ap.parse_args())
 
@@ -71,7 +72,7 @@ net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 if not args.get("input", False):
     print("[INFO] starting cameras...")
     vs1 = VideoStream(src=0).start()
-    vs2 = VideoStream(src=1).start()
+    # vs2 = VideoStream(src=1).start()
     time.sleep(2.0)
 writer = None
 # Frame dimensions initialisation
@@ -86,16 +87,17 @@ total_frames = 0
 total_persons = 0
 stitch = stitch()
 producer = kafka_producer(1002, "raspi1")
+secondproducer = kafka_producer(1003, "raspi2")
 
 fps = FPS().start()
 
 while True:
-    #frame1 = vs1.read()
-    frame2 = vs2.read()
+    frame1 = vs1.read()
+    # frame2 = vs2.read()
 
-    # frame = stitch.update(frame1, frame2)
-    # resize the frame and convert it from bgr to rgb for dlib
-    frame = imutils.resize(frame2, width=400)
+    # frame = stitch.update(frame2, frame1)
+    # resize the frame and convert it from bgr to rgb for dlib / keep the 16:9 ratio
+    frame = imutils.resize(frame1, width=400, height=225)
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     # Set the frame dimensions
@@ -106,7 +108,7 @@ while True:
     status = "Waiting"
     rects = []
     # Trigger object detection each x frames
-    if total_frames % args["skip_frames"] == 0 and len(inputQueues) == 0:
+    if total_frames % args["skip_frames"] == 0:
         status = "Detecting"
         trackers = []
         # Convert the frame to a blob
@@ -146,7 +148,6 @@ while True:
             rects.append((startX, startY, endX, endY))
 
         objects = ct.update(rects)
-
         for (object_id, center) in objects.items():
             to = trackable_persons.get(object_id, None)
             if to is None:
@@ -167,10 +168,11 @@ while True:
             y_center = int(center[1])
             # print(center[0], x_center)
             # print(center[1], y_center)
-            print(x_center, y_center)
-            data_to_send = {"centerX": int(x_center), "centerY": int(y_center), "id": int(object_id)}
+            print("The centers ", x_center, y_center)
+            data_to_send = {"centerX": int(x_center), "centerY": int(y_center), "id": int("1" + str(object_id))}
             json_data = json.dumps(data_to_send)
             producer.send(data_to_send)
+            secondproducer.send("hello")
     info = [
         ("Status", status),
     ]
