@@ -18,22 +18,27 @@ class center_tracker():
     def register(self, center):
         self.objects[self.nextObjectID] = center
         self.disappeared[self.nextObjectID] = 0
-        self.nextObjectID += 1
+        print("printing the objects", self.objects)
+        print("printing the disappeared objects", self.disappeared)
+        if self.nextObjectID < 9:
+            self.nextObjectID += 1
 
     def unregister(self, objectID):
         # to deregister an object ID we delete the object ID
         del self.objects[objectID]
         del self.disappeared[objectID]
+        if self.nextObjectID < 9:
+            self.nextObjectID -= 1
+        if self.nextObjectID <= 0:
+            self.nextObjectID = 0
+        print("printing the objects", self.objects)
+        print("printing the disappeared objects", self.disappeared)
 
     def update(self, rects):
         if len(rects) == 0:
             # loop over any existing tracked objects and mark them as disappeared
             for objectID in list(self.disappeared.keys()):
-                self.disappeared[objectID] += 1
-
-                # delete the object if we exceeded the maximum allowed
-                if self.disappeared[objectID] > self.maxDisappeared:
-                    self.unregister(objectID)
+               self.nextObjectID = 0
 
             return self.objects
         # initialize an array for the centers
