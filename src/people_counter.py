@@ -79,7 +79,7 @@ writer = None
 W = None
 H = None
 # center_tracker initialisation, list to store the dlib correlation trackers and dict to map each object_id to a persontrackable
-ct = center_tracker(max_disappeared=40)
+ct = center_tracker(max_disappeared=2)
 trackers = []
 trackable_persons = {}
 # Frames initialisation, and moving persons
@@ -156,7 +156,8 @@ while True:
                 to.centers.append(center)
                 if not to.counted:
                     to.counted = True
-
+            if (len(rects) == 0):
+                producer.send("empty")
             trackable_persons[object_id] = to
             # draw both the ID of the object and the centroid of the
             # object on the output frame
@@ -166,9 +167,6 @@ while True:
             cv2.circle(frame, (center[0], center[1]), 4, (0, 255, 0), -1)
             x_center = int(center[0])
             y_center = int(center[1])
-            # print(center[0], x_center)
-            # print(center[1], y_center)
-            print("The centers ", x_center, y_center)
             data_to_send = {"centerX": int(x_center), "centerY": int(y_center), "id": int("1" + str(object_id))}
             json_data = json.dumps(data_to_send)
             producer.send(data_to_send)
