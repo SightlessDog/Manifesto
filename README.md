@@ -8,3 +8,5 @@
 3. Install the required dependencies
    - pip install -r requirements.dev
    - pip install -r requirements.prod
+   
+python src/people_counter.py --prototxt=mobilnet/mobilnetSSD_deploy.prototxt --model=mobilnet/MobileNetSSD_deploy.caffemodel
