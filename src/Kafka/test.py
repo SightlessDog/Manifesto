@@ -1,5 +1,5 @@
 from kafka import KafkaProducer
-bootstrap_servers = ['localhost:9092']
+bootstrap_servers = ['192.168.0.104:9092']
 topicName = 'myTopic'
 producer = KafkaProducer(bootstrap_servers = bootstrap_servers)
 producer = KafkaProducer()
