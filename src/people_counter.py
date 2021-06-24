@@ -156,8 +156,9 @@ while True:
                 to.centers.append(center)
                 if not to.counted:
                     to.counted = True
-            if (len(rects) == 0):
-                producer.send("empty")
+            if len(rects) == 0:
+                print("DEBUG sending empty because there is no object being tracked")
+                producer.send({"isEmpty": True})
             trackable_persons[object_id] = to
             # draw both the ID of the object and the centroid of the
             # object on the output frame
@@ -167,10 +168,11 @@ while True:
             cv2.circle(frame, (center[0], center[1]), 4, (0, 255, 0), -1)
             x_center = int(center[0])
             y_center = int(center[1])
-            data_to_send = {"centerX": int(x_center), "centerY": int(y_center), "id": int("1" + str(object_id))}
-            json_data = json.dumps(data_to_send)
-            producer.send(data_to_send)
-            secondproducer.send("hello")
+            print("DEBUG sending the center points", x_center, y_center)
+            if len(rects) != 0:
+                data_to_send = {"centerX": int(x_center), "centerY": int(y_center), "id": int("1" + str(object_id))}
+                json_data = json.dumps(data_to_send)
+                producer.send(data_to_send)
     info = [
         ("Status", status),
     ]

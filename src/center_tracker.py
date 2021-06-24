@@ -38,7 +38,11 @@ class center_tracker():
         if len(rects) == 0:
             # loop over any existing tracked objects and mark them as disappeared
             for objectID in list(self.disappeared.keys()):
-               self.nextObjectID = 0
+                self.disappeared[objectID] += 1
+
+                # delete the object if we exceeded the maximum allowed
+                if self.disappeared[objectID] > self.maxDisappeared:
+                    self.unregister(objectID)
 
             return self.objects
         # initialize an array for the centers
