@@ -14,31 +14,6 @@ import cv2
 import json
 from Kafka.kafkaProducer import kafka_producer
 
-def start_t(box, label, rgb, inputQueue, outputQueue):
-    # construct a dlib rectangle object from the bounding box
-    # coordinates and then start the correlation tracker
-    t = dlib.correlation_tracker()
-    rect = dlib.rectangle(box[0], box[1], box[2], box[3])
-    t.start_track(rgb, rect)
-    trackers.append(t)
-
-    while True:
-        rgb = inputQueue.get()
-
-        if rgb is not None:
-            t.update(rgb)
-            pos = t.get_position()
-
-            # unpack the position object
-            startX = int(pos.left())
-            startY = int(pos.top())
-            endX = int(pos.right())
-            endY = int(pos.bottom())
-            # add the label + bounding box coordinates to the output
-            # queue
-            outputQueue.put((label, (startX, startY, endX, endY)))
-
-
 ap = argparse.ArgumentParser()
 ap.add_argument("-p", "--prototxt",
                 help="path to Caffe 'deploy' prototxt file")
@@ -71,8 +46,8 @@ net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 
 if not args.get("input", False):
     print("[INFO] starting cameras...")
-    vs1 = VideoStream(src=0).start()
-    # vs2 = VideoStream(src=1).start()
+    vs1 = VideoStream(0).start()
+    #vs2 = VideoStream(src=2).start()
     time.sleep(2.0)
 writer = None
 # Frame dimensions initialisation
@@ -87,15 +62,14 @@ total_frames = 0
 total_persons = 0
 stitch = stitch()
 producer = kafka_producer(1002, "raspi1")
-secondproducer = kafka_producer(1003, "raspi2")
 
 fps = FPS().start()
 
 while True:
     frame1 = vs1.read()
-    # frame2 = vs2.read()
+    #frame2 = vs2.read()
 
-    # frame = stitch.update(frame2, frame1)
+    #frame = stitch.update(frame2, frame1)
     # resize the frame and convert it from bgr to rgb for dlib / keep the 16:9 ratio
     frame = imutils.resize(frame1, width=400, height=225)
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -156,9 +130,6 @@ while True:
                 to.centers.append(center)
                 if not to.counted:
                     to.counted = True
-            if len(rects) == 0:
-                print("DEBUG sending empty because there is no object being tracked")
-                producer.send({"isEmpty": True})
             trackable_persons[object_id] = to
             # draw both the ID of the object and the centroid of the
             # object on the output frame
@@ -168,11 +139,14 @@ while True:
             cv2.circle(frame, (center[0], center[1]), 4, (0, 255, 0), -1)
             x_center = int(center[0])
             y_center = int(center[1])
-            print("DEBUG sending the center points", x_center, y_center)
             if len(rects) != 0:
+                print("DEBUG sending the center points", x_center, y_center)
                 data_to_send = {"centerX": int(x_center), "centerY": int(y_center), "id": int("1" + str(object_id))}
                 json_data = json.dumps(data_to_send)
                 producer.send(data_to_send)
+    if len(rects) == 0:
+        print("DEBUG sending empty because there is no object being tracked")
+        producer.send({"isEmpty": True, "id": 1})
     info = [
         ("Status", status),
     ]

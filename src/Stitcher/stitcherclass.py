@@ -32,6 +32,7 @@ class StitcherClass:
         # apply a perspective transform to stitch the images together using the cached homography matrix
         result = cv2.warpPerspective(imageA, self.cachedH, (imageA.shape[1] + imageB.shape[1], imageA.shape[0]))
         result[0:imageB.shape[0], 0:imageB.shape[1]] = imageB
+        print("[INFO] returning result from the stitcherclass")
         return result
 
     def detectAndDescribe(self, image):
