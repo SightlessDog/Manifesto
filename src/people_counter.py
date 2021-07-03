@@ -123,14 +123,15 @@ while True:
 
         objects = ct.update(rects)
         for (object_id, center) in objects.items():
-            to = trackable_persons.get(object_id, None)
-            if to is None:
-                to = PersonTrackable(object_id, center)
-            else:
-                to.centers.append(center)
-                if not to.counted:
-                    to.counted = True
-            trackable_persons[object_id] = to
+            if object_id <= 4:
+                to = trackable_persons.get(object_id, None)
+                if to is None:
+                    to = PersonTrackable(object_id, center)
+                else:
+                    to.centers.append(center)
+                    if not to.counted:
+                        to.counted = True
+                trackable_persons[object_id] = to
             # draw both the ID of the object and the centroid of the
             # object on the output frame
             text = "ID {}".format(object_id)
